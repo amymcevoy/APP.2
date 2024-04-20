@@ -1,0 +1,684 @@
+#define _CRT_SECURE_NO_WARNINGS //Stop scanf being ignored
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <conio.h>
+
+typedef struct
+{
+    int irfuNum;
+    char firstName[40];
+    char secondName[40];
+    int age;
+    double height;
+    double weight;
+    char club[40];
+    char email[40];
+    char position[40];
+    int tacklesMissed;
+    int metresMade;
+
+} rugbyPlayer; //Player database
+
+typedef enum
+{
+    PROP,
+    HOOKER,
+    SECOND_ROW,
+    BACK_ROW,
+    HALF_BACK,
+    CENTRES,
+    WINGERS_FULL_BACK
+
+} PlayerPosition; //Position Database
+
+typedef struct
+{
+    char password[7];
+    char username[7];
+
+} Login; //Login
+
+typedef struct Node
+{
+    rugbyPlayer data;
+    struct Node* next;
+
+} Node; 
+
+// Function prototypes
+void readLoginFromFile(Login logins[]);
+int authenticate(Login logins[]);
+void addPlayer(Node** head);
+void insertNode(Node** head, rugbyPlayer newPlayer);
+void displayAllPlayers(Node* head);
+void displayPlayerDetails(Node* head, int irfuNum);
+void initializeLinkedListFromTextFile(Node** head);
+void deletePlayer(Node** head, int irfuNum);
+void generateStatistics(Node* head);
+void printPlayerDetailsToFile(Node* head);
+void sortPlayersByHeight(Node* head);
+void swap(rugbyPlayer* a, rugbyPlayer* b);
+int isIRFUnumberUnique(Node* head, int irfuNum);
+int isValidEmail(const char* email);
+void updatePlayerStatistic(Node* head, int irfuNum);
+void printLinkedListToFile(Node* head);
+void freeLinkedList(Node* head);
+
+int main()
+{
+    Login logins[3]; // 3 attempts
+
+    Node* head = NULL;
+    int choice = 0;
+
+    readLoginFromFile(logins); // Read login file
+
+    if (authenticate(logins))
+    {
+        printf("Login successful!\n");
+
+        // Load player data from file into linked list
+        initializeLinkedListFromTextFile(&head);
+
+        printf("Entering menu loop...\n"); // Debug message
+
+        // Menu loop
+        do
+        {
+            printf("\n----- Menu -----\n");
+            printf("1. Add Player\n");
+            printf("2. Display All Players\n");
+            printf("3. Display Player Details\n");
+            printf("4. Update Player's Statistic\n");
+            printf("5. Delete Player\n");
+            printf("6. Generate Statistics\n");
+            printf("7. Print Player Details to File\n");
+            printf("8. Sort Players by Height\n");
+            printf("9. Exit\n");
+            printf("Enter your choice: ");
+            scanf("%d", &choice);
+            getchar(); // New line character
+
+            printf("Choice entered: %d\n", choice); // Debug message
+
+            switch (choice)
+            {
+            case 1:
+                addPlayer(&head);
+                break;
+            case 2:
+                displayAllPlayers(head);
+                break;
+            case 3:
+            {
+                int irfuNum;
+                printf("Enter IRFU Number of the player: ");
+                scanf("%d", &irfuNum);
+                getchar();
+                displayPlayerDetails(head, irfuNum);
+                break;
+            }
+            case 4:
+            {
+                int irfuNum;
+                printf("Enter IRFU Number of the player to update: ");
+                scanf("%d", &irfuNum);
+                getchar();
+                updatePlayerStatistic(head, irfuNum);
+                break;
+            }
+            case 5:
+            {
+                int irfuNum;
+                printf("Enter IRFU Number of the player to delete: ");
+                scanf("%d", &irfuNum);
+                getchar();
+                deletePlayer(&head, irfuNum);
+                break;
+            }
+            case 6:
+                generateStatistics(head);
+                break;
+            case 7:
+                printPlayerDetailsToFile(head);
+                break;
+            case 8:
+                sortPlayersByHeight(head);
+                break;
+            case 9:
+                printf("Exiting program.\n");
+                printLinkedListToFile(head);
+                freeLinkedList(head);
+                break;
+            default:
+                printf("Invalid choice. Please try again.\n");
+            }
+
+            printf("Looping back...\n"); // Debug message
+        } while (choice != 9);
+    }
+    else
+    {
+        printf("Login Failed.\n");
+    }
+
+    return 0;
+}
+
+
+void readLoginFromFile(Login logins[]) 
+{
+    FILE* loginFile = fopen("login.txt", "r");
+
+    if (loginFile == NULL)
+    {
+        printf("Error opening login file\n");
+        exit(1);
+    }
+
+    for (int i = 0; i < 3; i++)
+    {
+        fscanf(loginFile, "%s %s", logins[i].username, logins[i].password);
+    }
+
+    fclose(loginFile);
+}
+
+int authenticate(Login logins[])
+{
+    char username[7];
+    char password[7];
+
+    printf("Enter Username: ");
+    scanf("%6s", username);
+    getchar(); // Clear newline character from input buffer
+
+    printf("Enter Password: ");
+
+    // Hide password 
+    int i = 0;
+    while (i < 6) {
+        password[i] = getch();
+        printf("*");
+        i++;
+    }
+    password[i] = '\0'; // Terminate the string
+    printf("\n");
+
+    // Clear newline character from input buffer
+    getchar();
+
+    for (int i = 0; i < 3; i++)
+    {
+        if (strcmp(username, logins[i].username) == 0 && strcmp(password, logins[i].password) == 0)
+        {
+            return 1; // Authentication successful
+        }
+    }
+
+    return 0; // Authentication failed
+}
+
+
+
+void addPlayer(Node** head)
+{
+    rugbyPlayer newPlayer;
+
+    printf("Enter IRFU Number: ");
+    scanf("%d", &newPlayer.irfuNum);
+    getchar(); // Flush newline character
+
+    // Validate IRFU number uniqueness
+    if (!isIRFUnumberUnique(*head, newPlayer.irfuNum))
+    {
+        printf("IRFU Number already exists. Please enter a unique number.\n");
+        return;
+    }
+
+    printf("Enter First Name: ");
+    scanf("%s", newPlayer.firstName);
+    getchar(); // Flush newline character
+
+    printf("Enter Second Name: ");
+    scanf("%s", newPlayer.secondName);
+    getchar(); // Flush newline character
+
+    printf("Enter Age: ");
+    scanf("%d", &newPlayer.age);
+    getchar(); // Flush newline character
+
+    printf("Enter Height: ");
+    scanf("%lf", &newPlayer.height);
+    getchar(); // Flush newline character
+
+    printf("Enter Weight: ");
+    scanf("%lf", &newPlayer.weight);
+    getchar(); // Flush newline character
+
+    printf("Enter Club: ");
+    scanf("%s", newPlayer.club);
+    getchar(); // Flush newline character
+
+    // Validate and read email until it is valid
+    do
+    {
+        printf("Enter Email: ");
+        scanf("%s", newPlayer.email);
+        getchar(); // Flush newline character
+    } while (!isValidEmail(newPlayer.email));
+
+    printf("Enter Position (0-6):\n");
+    printf("0. Prop\n1. Hooker\n2. Second Row\n3. Back Row\n4. Half Back\n5. Centres\n6. Wingers/Full Back\n");
+    int positionIndex;
+    scanf("%d", &positionIndex);
+    getchar(); // Flush newline character
+
+    if (positionIndex < 0 || positionIndex > 6)
+    {
+        printf("Invalid position index.\n");
+        return;
+    }
+
+    switch (positionIndex)
+    {
+    case 0:
+        strcpy(newPlayer.position, "Prop");
+        break;
+    case 1:
+        strcpy(newPlayer.position, "Hooker");
+        break;
+    case 2:
+        strcpy(newPlayer.position, "Second Row");
+        break;
+    case 3:
+        strcpy(newPlayer.position, "Back Row");
+        break;
+    case 4:
+        strcpy(newPlayer.position, "Half Back");
+        break;
+    case 5:
+        strcpy(newPlayer.position, "Centres");
+        break;
+    case 6:
+        strcpy(newPlayer.position, "Wingers/Full Back");
+        break;
+    }
+
+    printf("Enter Tackles Missed (0-3):\n");
+    printf("0. Never\n1. Less than three times per match\n2. Less than five times per match\n3. More than five times per match\n");
+    int tacklesIndex;
+    scanf("%d", &tacklesIndex);
+    getchar(); // Flush newline character
+
+    if (tacklesIndex < 0 || tacklesIndex > 3)
+    {
+        printf("Invalid tackles index.\n");
+        return;
+    }
+    newPlayer.tacklesMissed = tacklesIndex;
+
+    printf("Enter Metres Made (0-3):\n");
+    printf("0. None\n1. Less than 10 metres\n2. Less than 20 metres\n3. More than 20 metres\n");
+    int metresIndex;
+    scanf("%d", &metresIndex);
+    getchar(); // Flush newline character
+
+    if (metresIndex < 0 || metresIndex > 3)
+    {
+        printf("Invalid metres index.\n");
+        return;
+    }
+    newPlayer.metresMade = metresIndex;
+
+    // Add player to linked list
+    insertNode(head, newPlayer);
+    printf("Player added successfully.\n");
+}
+
+void insertNode(Node** head, rugbyPlayer newPlayer)
+{
+    // Allocate memory for the new node
+    Node* newNode = (Node*)malloc(sizeof(Node));
+
+    if (newNode == NULL) 
+    {
+        printf("Memory allocation failed.\n");
+        return;
+    }
+
+    // Set data for the new node
+    newNode->data = newPlayer;
+    newNode->next = NULL;
+
+    // If the list is empty, make the new node the head
+    if (*head == NULL) 
+    {
+        *head = newNode;
+        return;
+    }
+
+    // Find the last node in the list
+    Node* lastNode = *head;
+    while (lastNode->next != NULL) 
+    {
+        lastNode = lastNode->next;
+    }
+
+    // Insert the new node at the end of the list
+    lastNode->next = newNode;
+}
+
+void displayAllPlayers(Node* head)
+{
+    if (head == NULL)
+    {
+        printf("No players to display.\n");
+        return;
+    }
+
+    Node* current = head;
+
+    printf("All Players:\n");
+
+    while (current != NULL)
+    {
+        printf("IRFU Number: %d\n", current->data.irfuNum);
+        printf("Name: %s %s\n", current->data.firstName, current->data.secondName);
+        printf("Age: %d\n", current->data.age);
+        printf("Height: %.2lf\n", current->data.height);
+        printf("Weight: %.2lf\n", current->data.weight);
+        printf("Club: %s\n", current->data.club);
+        printf("Email: %s\n", current->data.email);
+        printf("Position: %s\n", current->data.position);
+        printf("Tackles Missed: %d\n", current->data.tacklesMissed);
+        printf("Metres Made: %d\n\n", current->data.metresMade);
+        current = current->next;
+    }
+}
+
+void displayPlayerDetails(Node* head, int irfuNum)
+{
+    Node* current = head;
+    while (current != NULL)
+    {
+        if (current->data.irfuNum == irfuNum)
+        {
+            printf("Player Details:\n");
+            printf("IRFU Number: %d\n", current->data.irfuNum);
+            printf("Name: %s %s\n", current->data.firstName, current->data.secondName);
+            printf("Age: %d\n", current->data.age);
+            printf("Height: %.2lf\n", current->data.height);
+            printf("Weight: %.2lf\n", current->data.weight);
+            printf("Club: %s\n", current->data.club);
+            printf("Email: %s\n", current->data.email);
+            printf("Position: %s\n", current->data.position);
+            printf("Tackles Missed: %d\n", current->data.tacklesMissed);
+            printf("Metres Made: %d\n", current->data.metresMade);
+            return;
+        }
+        current = current->next;
+    }
+    printf("Player with IRFU Number %d not found.\n", irfuNum);
+}
+
+void initializeLinkedListFromTextFile(Node** head)
+{
+    FILE* file = fopen("Rugby.txt", "r");
+
+    if (file == NULL)
+    {
+        printf("Error opening Rugby.txt\n");
+        return;
+    }
+
+    rugbyPlayer player;
+    while (fscanf(file, "%d %s %s %d %lf %lf %s %s %s %d %d\n",
+        &player.irfuNum, player.firstName, player.secondName,
+        &player.age, &player.height, &player.weight, player.club,
+        player.email, player.position, &player.tacklesMissed,
+        &player.metresMade) != EOF)
+    {
+        insertNode(head, player);
+    }
+
+    fclose(file);
+}
+
+void deletePlayer(Node** head, int irfuNum)
+{
+    if (*head == NULL)
+    {
+        printf("List is empty. No players to delete.\n");
+        return;
+    }
+
+    Node* current = *head;
+    Node* prev = NULL;
+
+    while (current != NULL)
+    {
+        if (current->data.irfuNum == irfuNum)
+        {
+            if (prev == NULL)
+            {
+                *head = current->next;
+            }
+            else
+            {
+                prev->next = current->next;
+            }
+            free(current);
+            printf("Player with IRFU Number %d deleted successfully.\n", irfuNum);
+            return;
+        }
+        prev = current;
+        current = current->next;
+    }
+
+    printf("Player with IRFU Number %d not found.\n", irfuNum);
+}
+
+void generateStatistics(Node* head)
+{
+    if (head == NULL)
+    {
+        printf("No players to generate statistics.\n");
+        return;
+    }
+
+    int totalTacklesMissed = 0;
+    int totalMetresMade = 0;
+    int numPlayers = 0;
+
+    Node* current = head;
+
+    while (current != NULL)
+    {
+        totalTacklesMissed += current->data.tacklesMissed;
+        totalMetresMade += current->data.metresMade;
+        numPlayers++;
+        current = current->next;
+    }
+
+    printf("Statistics:\n");
+    printf("Total Tackles Missed: %d\n", totalTacklesMissed);
+    printf("Total Metres Made: %d\n", totalMetresMade);
+    printf("Average Tackles Missed per Player: %.2lf\n", (double)totalTacklesMissed / numPlayers);
+    printf("Average Metres Made per Player: %.2lf\n", (double)totalMetresMade / numPlayers);
+}
+
+void printPlayerDetailsToFile(Node* head)
+{
+    if (head == NULL)
+    {
+        printf("No players to print.\n");
+        return;
+    }
+
+    FILE* file = fopen("PlayerDetails.txt", "w");
+
+    if (file == NULL)
+    {
+        printf("Error opening PlayerDetails.txt for writing.\n");
+        return;
+    }
+
+    Node* current = head;
+
+    while (current != NULL)
+    {
+        fprintf(file, "IRFU Number: %d\n", current->data.irfuNum);
+        fprintf(file, "Name: %s %s\n", current->data.firstName, current->data.secondName);
+        fprintf(file, "Age: %d\n", current->data.age);
+        fprintf(file, "Height: %.2lf\n", current->data.height);
+        fprintf(file, "Weight: %.2lf\n", current->data.weight);
+        fprintf(file, "Club: %s\n", current->data.club);
+        fprintf(file, "Email: %s\n", current->data.email);
+        fprintf(file, "Position: %s\n", current->data.position);
+        fprintf(file, "Tackles Missed: %d\n", current->data.tacklesMissed);
+        fprintf(file, "Metres Made: %d\n\n", current->data.metresMade);
+        current = current->next;
+    }
+
+    fclose(file);
+    printf("Player details printed to PlayerDetails.txt successfully.\n");
+}
+
+void sortPlayersByHeight(Node* head)
+{
+    if (head == NULL || head->next == NULL)
+    {
+        printf("Not enough players to sort.\n");
+        return;
+    }
+
+    int swapped;
+    Node* current;
+    Node* lastNode = NULL;
+
+    do
+    {
+        swapped = 0;
+        current = head;
+
+        while (current->next != lastNode)
+        {
+            if (current->data.height > current->next->data.height)
+            {
+                swap(&current->data, &current->next->data);
+                swapped = 1;
+            }
+            current = current->next;
+        }
+        lastNode = current;
+    } while (swapped);
+}
+
+void swap(rugbyPlayer* a, rugbyPlayer* b)
+{
+    rugbyPlayer temp = *a;
+    *a = *b;
+    *b = temp;
+}
+
+int isIRFUnumberUnique(Node* head, int irfuNum)
+{
+    Node* current = head;
+    while (current != NULL)
+    {
+        if (current->data.irfuNum == irfuNum)
+        {
+            return 0; // IRFU number already exists
+        }
+        current = current->next;
+    }
+    return 1; // IRFU number is unique
+}
+
+int isValidEmail(const char* email)
+{
+    //Checks for '@' symbol
+    return strchr(email, '@') != NULL;
+}
+
+void updatePlayerStatistic(Node* head, int irfuNum)
+{
+    Node* current = head;
+    while (current != NULL)
+    {
+        if (current->data.irfuNum == irfuNum)
+        {
+            printf("Enter new number of Tackles Missed (0-3):\n");
+            printf("0. Never\n1. Less than three times per match\n2. Less than five times per match\n3. More than five times per match\n");
+            int newTacklesMissed;
+            scanf("%d", &newTacklesMissed);
+            getchar(); // Flush newline character
+
+            if (newTacklesMissed < 0 || newTacklesMissed > 3)
+            {
+                printf("Invalid tackles index.\n");
+                return;
+            }
+
+            printf("Enter new number of Metres Made (0-3):\n");
+            printf("0. None\n1. Less than 10 metres\n2. Less than 20 metres\n3. More than 20 metres\n");
+            int newMetresMade;
+            scanf("%d", &newMetresMade);
+            getchar(); // Flush newline character
+
+            if (newMetresMade < 0 || newMetresMade > 3)
+            {
+                printf("Invalid metres index.\n");
+                return;
+            }
+
+            current->data.tacklesMissed = newTacklesMissed;
+            current->data.metresMade = newMetresMade;
+
+            printf("Player statistics updated successfully.\n");
+            return;
+        }
+        current = current->next;
+    }
+    printf("Player with IRFU Number %d not found.\n", irfuNum);
+}
+
+void printLinkedListToFile(Node* head)
+{
+    FILE* file = fopen("Rugby.txt", "w");
+    if (file == NULL)
+    {
+        printf("Error opening Rugby.txt for writing.\n");
+        return;
+    }
+
+    Node* current = head;
+    while (current != NULL)
+    {
+        fprintf(file, "%d %s %s %d %.2lf %.2lf %s %s %s %d %d\n",
+            current->data.irfuNum, current->data.firstName, current->data.secondName,
+            current->data.age, current->data.height, current->data.weight, current->data.club,
+            current->data.email, current->data.position, current->data.tacklesMissed,
+            current->data.metresMade);
+        current = current->next;
+    }
+
+    fclose(file);
+    printf("Player details saved to Rugby.txt successfully.\n");
+}
+
+void freeLinkedList(Node* head)
+{
+    Node* current = head;
+    Node* next;
+
+    while (current != NULL)
+    {
+        next = current->next;
+        free(current);
+        current = next;
+    }
+}
